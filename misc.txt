@@ -1,0 +1,15 @@
+problem:
+Eve is an artist who creates art installations from hammering nails into wooden boards and
+putting rubber bands around them. Being a completionist, she wants to add rubber bands
+around every subset of nails as long as the rubber band remains convex. The rubber bands
+she has at home are labelled with an integer. She starts by placing a rubber band labelled 1
+around each single nail. For every other rubber band, she imposes the following rule:
+The sum of the labels of each rubber band and all the rubber bands it contains is 1.
+Here, a rubber band B1 contains a rubber band B2, if all the nails that B2 encloses are also
+enclosed by B1.
+
+aspects:
+-2d array to store pins location
+-calculate all non empty subsets
+-check if the shape created is concave
+-https://cp-algorithms.com/geometry/convex-hull.html algorithm 
