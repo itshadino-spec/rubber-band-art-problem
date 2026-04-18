@@ -5,8 +5,8 @@
 #include <SDL2/SDL_image.h>
 
 #define title "rubber band art"
-#define height 576
-#define width 720
+#define height 640
+#define width 640
 #define sixtyfps 16
 
 struct Node{  
@@ -19,27 +19,22 @@ struct Game{
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *background;
-    struct Node nodes [400];
+    SDL_Texture *nodesprite;
+    SDL_Rect noderects [400];
     int count;
+    int textureheight;
+    int texturewidth;
 };
 
 
 bool load(struct Game *game);
 bool init(struct Game *game);
 void delete(struct Game *game, int exitstatus);
-bool addnode(struct Node *node, struct Game *game);
+void addnode(struct Node *node, struct Game *game);
 
 int main(void){
     bool clickflag = false;
-    struct Game game = {
-        .window = NULL,
-        .renderer = NULL,
-        .background = NULL,
-        .nodes = NULL,
-        .count = 0
-
-    };
-
+    struct Game game = {0};
     struct Node node ={
         .xcoordinate = 0,
         .ycoordinate = 0,
@@ -54,6 +49,7 @@ int main(void){
     }
 
     while(true){
+        
         SDL_Event event;
         while(SDL_PollEvent(&event)){
             switch(event.type){
@@ -66,6 +62,7 @@ int main(void){
                             break;
                         default:
                             break;
+                    break;
                     }
                 case SDL_MOUSEBUTTONDOWN:
                     clickflag = true;
@@ -75,10 +72,16 @@ int main(void){
                     break;
                 default:
                     break;
+            
             }
+
         }
         SDL_RenderClear(game.renderer);
-        SDL_RenderCopy(game.renderer, game.background, NULL,NULL);
+
+        SDL_RenderCopy(game.renderer, game.background, NULL, NULL);
+        for (int i = 0; i < game.count; i++) {
+            SDL_RenderCopy(game.renderer, game.nodesprite, NULL, &game.noderects[i]);
+        }
         SDL_RenderPresent(game.renderer);
 
         SDL_Delay(sixtyfps);
@@ -91,9 +94,11 @@ int main(void){
 }
 
 void delete(struct Game *game, int exitstatus){
+    if(game->background) SDL_DestroyTexture(game->background);
+    if(game->nodesprite) SDL_DestroyTexture(game->nodesprite);
+
     SDL_DestroyRenderer(game -> renderer);
     SDL_DestroyWindow(game -> window);
-    SDL_DestroyTexture(game -> background);
     SDL_Quit();
     IMG_Quit();
     exit(exitstatus);
@@ -125,6 +130,12 @@ bool init(struct Game *game){
         fprintf(stderr, "error creating renderer: %s \n", SDL_GetError());
         return true;
     }
+    game -> nodesprite = IMG_LoadTexture(game ->renderer, "images/node.png");
+    if(SDL_QueryTexture(game -> nodesprite, NULL, NULL, &game -> texturewidth, &game->textureheight)){
+        fprintf(stderr, "error creating node's texture: %s \n", SDL_GetError());
+        return true;
+    }
+
     return false;
 }
 
@@ -137,7 +148,16 @@ bool load(struct Game *game){
     return false;
 }
 
-bool addnode(struct Node *node,struct Game *game){
-    printf("xcoordinate: %i, y:coordinate: %i \n", node -> xcoordinate, node -> ycoordinate);   
+void addnode(struct Node *node,struct Game *game){
+    printf("xcoordinate: %i, y:coordinate: %i \n", (int)node->xcoordinate, (int)node->ycoordinate);
+
+    SDL_Rect noderect;
+    noderect.h = game->textureheight;
+    noderect.w = game->texturewidth;
+    noderect.x = node->xcoordinate;
+    noderect.y = node->ycoordinate;
+
+    game->noderects[game->count] = noderect; 
+    game->count ++;   
 }
 
