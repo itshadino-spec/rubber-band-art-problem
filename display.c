@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -15,12 +16,21 @@ struct Node{
     SDL_Texture *node;
 };
 
+typedef struct{
+    SDL_Rect area;
+    SDL_Color colour;
+
+    void (*leftClick)(void* self, void* game);
+    void (*rightClick)(void* self);
+}Button;
+
 struct Game{
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *background;
     SDL_Texture *nodesprite;
     SDL_Rect noderects [400];
+    Button buttons[500];
     int count;
     int textureheight;
     int texturewidth;
@@ -31,6 +41,8 @@ bool load(struct Game *game);
 bool init(struct Game *game);
 void delete(struct Game *game, int exitstatus);
 void addnode(struct Node *node, struct Game *game);
+void leftClickFunc(void *buttonPointer, void *gamePointer);
+void rightClickFunc(void *self);
 
 int main(void){
     bool clickflag = false;
@@ -40,6 +52,12 @@ int main(void){
         .ycoordinate = 0,
         .node = NULL
     };
+
+
+    Button button;
+    button.area = (SDL_Rect){0};
+    button.leftClick = leftClickFunc;
+    button.rightClick = rightClickFunc;
 
     if(init(&game)){
         delete(&game, EXIT_FAILURE);
@@ -59,17 +77,33 @@ int main(void){
                 case SDL_KEYDOWN:
                     switch(event.key.keysym.scancode){
                         case SDL_SCANCODE_ESCAPE:
+                            delete(&game, EXIT_SUCCESS);
                             break;
                         default:
                             break;
-                    break;
                     }
                 case SDL_MOUSEBUTTONDOWN:
-                    clickflag = true;
-                    node.xcoordinate = event.button.x;
-                    node.ycoordinate = event.button.y;
-                    addnode(&node, &game);
-                    break;
+                    SDL_Point mousePos = {event.button.x, event.button.y};
+                    bool hitButton = false;
+
+                    for (int i = 0; i < game.count; i++) {
+                    if (SDL_PointInRect(&mousePos, &game.buttons[i].area)) {
+                            hitButton = true;
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                    game.buttons[i].leftClick(&game.buttons[i], &game);
+                }
+                    else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    game.buttons[i].rightClick(&game.buttons[i]);
+                }
+            break;
+        }
+    }
+            if (!hitButton && event.button.button == SDL_BUTTON_LEFT) {
+                node.xcoordinate = event.button.x;
+                node.ycoordinate = event.button.y;
+                addnode(&node, &game);
+            }
+            break;
                 default:
                     break;
             
@@ -149,15 +183,41 @@ bool load(struct Game *game){
 }
 
 void addnode(struct Node *node,struct Game *game){
-    printf("xcoordinate: %i, y:coordinate: %i \n", (int)node->xcoordinate, (int)node->ycoordinate);
-
     SDL_Rect noderect;
     noderect.h = game->textureheight;
     noderect.w = game->texturewidth;
-    noderect.x = node->xcoordinate;
-    noderect.y = node->ycoordinate;
+    noderect.x = (int)round((float)node->xcoordinate / 64.0f) *64 -16;
+    noderect.y = (int)round((float)node ->ycoordinate / 64.0f) *64 -16;
+
+    game->noderects[game->count] = noderect;
+    game->buttons[game->count].area = noderect; 
+    game->buttons[game->count].leftClick = leftClickFunc;
+    game->buttons[game->count].rightClick = rightClickFunc;
 
     game->noderects[game->count] = noderect; 
     game->count ++;   
+}
+
+void leftClickFunc(void *buttonPointer, void *gamePointer){
+    printf("leftclick\n");
+    Button *clickedButton = (Button *)buttonPointer;
+    struct Game *game = (struct Game *)gamePointer;
+    int index = -1;
+    for (int i = 0; i < game->count; i++) {
+        if (&game->buttons[i] == clickedButton) {
+            index = i;
+            break;
+        }
+    }
+    if (index != -1) {
+        game->noderects[index] = game->noderects[game->count - 1];
+        game->buttons[index] = game->buttons[game->count - 1];
+        game->count--;
+    }
+}
+void rightClickFunc(void *self){
+    printf("rightclick\n");
+    int x = ((Button *)self)->area.x;
+    int y = ((Button *)self)->area.y;
 }
 
