@@ -21,10 +21,10 @@ typedef struct{
     Sint32 yStartingNode;
     Sint32 xEndingNode;
     Sint32 yEndingNode;
-    SDL_Texture *band;
     SDL_Rect bands [100];
     char label [100];
     int angle;
+    int length;
 }RubberBand;
 
 typedef struct{
@@ -40,6 +40,7 @@ struct Game{
     SDL_Renderer *renderer;
     SDL_Texture *background;
     SDL_Texture *nodesprite;
+    SDL_Texture *rubberBandSprite;
     SDL_Rect nodeRects [400];
     RubberBand bands[500];
     Button buttons[500];
@@ -48,8 +49,10 @@ struct Game{
     int nodeCount;
     int xTempStartNode;
     int yTempStartNode;
-    int textureheight;
-    int texturewidth;
+    int nodeTextureHeight;
+    int nodeTextureWidth;
+    int rubberBandTextureHeight;
+    int rubberBandTextureWidth;
 };
 
 
@@ -68,7 +71,6 @@ int main(void){
         .yCoordinatesS = 0,
         .node = NULL
     };
-
 
     Button button;
     button.area = (SDL_Rect){0};
@@ -112,13 +114,12 @@ int main(void){
                             }
                         }   
                     }
+                    if (!hitButton && event.button.button == SDL_BUTTON_LEFT) {
+                        node.xCoordinates = event.button.x;
+                        node.yCoordinatesS = event.button.y;
+                        addnode(&node, &game);
+                    }
                     break;
-                if (!hitButton && event.button.button == SDL_BUTTON_LEFT) {
-                    node.xCoordinates = event.button.x;
-                    node.yCoordinatesS = event.button.y;
-                    addnode(&node, &game);
-                }
-                break;
 
                 case SDL_MOUSEBUTTONUP:
 
@@ -126,9 +127,28 @@ int main(void){
                         if (SDL_PointInRect(&mousePos, &game.buttons[i].area)) {
                             hitButton = true;
                         if(event.button.button == SDL_BUTTON_RIGHT && game.creatingBand){
-                            game.buttons[i].rightClick(&game.buttons[i], &game);
+                            game.bands[game.bandCount].xStartingNode = game.xTempStartNode;
+                            game.bands[game.bandCount].yStartingNode = game.yTempStartNode;
+                            game.bands[game.bandCount].xEndingNode = game.buttons[i].area.x;
+                            game.bands[game.bandCount].yEndingNode = game.buttons[i].area.y;
+
+                            int xDelta = (game.bands[game.bandCount].xEndingNode) - (game.bands[game.bandCount].xStartingNode);
+                            int yDelta = (game.bands[game.bandCount].yEndingNode) - (game.bands[game.bandCount].yStartingNode);
+                            double rads = atan2(yDelta, xDelta);
+                            double degrees = rads * (180/3.14);
+                            double length = sqrt(pow(xDelta, 2) + pow(yDelta, 2));
+
+                            game.bands[game.bandCount].length = length;
+                            game.bands[game.bandCount].angle = degrees;
+                            printf("degrees: %lf\nlength: %lf\n", degrees, length);
+
+                            game.bandCount ++;
+                            game.creatingBand = false;
+                            break;
                         }
+                        break;
                     }
+                }
                     break;
                 default:
                     break;
@@ -138,7 +158,26 @@ int main(void){
         }
         SDL_RenderClear(game.renderer);
 
+
         SDL_RenderCopy(game.renderer, game.background, NULL, NULL);
+        for(int i = 0; i < game.bandCount; i++){
+            SDL_Rect destinationRect;
+            destinationRect.x = game.bands[i].xStartingNode + 16;
+            destinationRect.y = game.bands[i].yStartingNode + 16;
+            destinationRect.w = game.bands[i].length;             
+            destinationRect.h = 4;
+
+            SDL_Point centre = {0,2};
+            SDL_RenderCopyEx(
+                game.renderer, 
+                game.rubberBandSprite, 
+                NULL,           
+                &destinationRect,      
+                game.bands[i].angle, 
+                &centre,        
+                SDL_FLIP_NONE   
+        );
+        }
         for (int i = 0; i < game.nodeCount; i++) {
             SDL_RenderCopy(game.renderer, game.nodesprite, NULL, &game.nodeRects[i]);
         }
@@ -156,6 +195,7 @@ int main(void){
 void delete(struct Game *game, int exitstatus){
     if(game->background) SDL_DestroyTexture(game->background);
     if(game->nodesprite) SDL_DestroyTexture(game->nodesprite);
+    if(game->rubberBandSprite) SDL_DestroyTexture(game->rubberBandSprite);
 
     SDL_DestroyRenderer(game -> renderer);
     SDL_DestroyWindow(game -> window);
@@ -191,7 +231,13 @@ bool init(struct Game *game){
         return true;
     }
     game -> nodesprite = IMG_LoadTexture(game ->renderer, "images/node.png");
-    if(SDL_QueryTexture(&game -> nodesprite, NULL, NULL, &game -> texturewidth, &game->textureheight)){
+    if(SDL_QueryTexture(game -> nodesprite, NULL, NULL, &game -> nodeTextureWidth, &game->nodeTextureHeight)){
+        fprintf(stderr, "error creating node's texture: %s \n", SDL_GetError());
+        return true;
+    }
+
+    game -> rubberBandSprite = IMG_LoadTexture(game ->renderer, "images/red.png");
+    if(SDL_QueryTexture(game -> rubberBandSprite, NULL, NULL, &game -> rubberBandTextureWidth, &game->rubberBandTextureHeight)){
         fprintf(stderr, "error creating node's texture: %s \n", SDL_GetError());
         return true;
     }
@@ -210,8 +256,8 @@ bool load(struct Game *game){
 
 void addnode(struct Node *node,struct Game *game){
     SDL_Rect nodeRect;
-    nodeRect.h = game->textureheight;
-    nodeRect.w = game->texturewidth;
+    nodeRect.h = game->nodeTextureHeight;
+    nodeRect.w = game->nodeTextureWidth;
     nodeRect.x = (int)round((float)node->xCoordinates / 64.0f) *64 -16;
     nodeRect.y = (int)round((float)node ->yCoordinatesS / 64.0f) *64 -16;
 
