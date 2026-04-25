@@ -11,17 +11,28 @@
 #define sixtyfps 16
 
 struct Node{  
-    Sint32 xcoordinate;
-    Sint32 ycoordinate;
+    Sint32 xCoordinates;
+    Sint32 yCoordinatesS;
     SDL_Texture *node;
 };
+
+typedef struct{
+    Sint32 xStartingNode;
+    Sint32 yStartingNode;
+    Sint32 xEndingNode;
+    Sint32 yEndingNode;
+    SDL_Texture *band;
+    SDL_Rect bands [100];
+    char label [100];
+    int angle;
+}RubberBand;
 
 typedef struct{
     SDL_Rect area;
     SDL_Color colour;
 
     void (*leftClick)(void* self, void* game);
-    void (*rightClick)(void* self);
+    void (*rightClick)(void* self, void* game);
 }Button;
 
 struct Game{
@@ -29,9 +40,14 @@ struct Game{
     SDL_Renderer *renderer;
     SDL_Texture *background;
     SDL_Texture *nodesprite;
-    SDL_Rect noderects [400];
+    SDL_Rect nodeRects [400];
+    RubberBand bands[500];
     Button buttons[500];
-    int count;
+    bool creatingBand;
+    int bandCount;
+    int nodeCount;
+    int xTempStartNode;
+    int yTempStartNode;
     int textureheight;
     int texturewidth;
 };
@@ -42,14 +58,14 @@ bool init(struct Game *game);
 void delete(struct Game *game, int exitstatus);
 void addnode(struct Node *node, struct Game *game);
 void leftClickFunc(void *buttonPointer, void *gamePointer);
-void rightClickFunc(void *self);
+void rightClickFunc(void *buttonPointer, void *gamePointer);
 
 int main(void){
     bool clickflag = false;
     struct Game game = {0};
     struct Node node ={
-        .xcoordinate = 0,
-        .ycoordinate = 0,
+        .xCoordinates = 0,
+        .yCoordinatesS = 0,
         .node = NULL
     };
 
@@ -67,9 +83,10 @@ int main(void){
     }
 
     while(true){
-        
         SDL_Event event;
         while(SDL_PollEvent(&event)){
+            bool hitButton = false;
+            SDL_Point mousePos = {event.button.x, event.button.y};
             switch(event.type){
                 case SDL_QUIT:
                     delete(&game, EXIT_SUCCESS);
@@ -83,27 +100,36 @@ int main(void){
                             break;
                     }
                 case SDL_MOUSEBUTTONDOWN:
-                    SDL_Point mousePos = {event.button.x, event.button.y};
-                    bool hitButton = false;
 
-                    for (int i = 0; i < game.count; i++) {
-                    if (SDL_PointInRect(&mousePos, &game.buttons[i].area)) {
+                    for (int i = 0; i < game.nodeCount; i++) {
+                        if (SDL_PointInRect(&mousePos, &game.buttons[i].area)) {
                             hitButton = true;
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                    game.buttons[i].leftClick(&game.buttons[i], &game);
+                            if (event.button.button == SDL_BUTTON_LEFT) {
+                                game.buttons[i].leftClick(&game.buttons[i], &game);
+                            }
+                            else if (event.button.button == SDL_BUTTON_RIGHT) {
+                                game.buttons[i].rightClick(&game.buttons[i], &game);
+                            }
+                        }   
+                    }
+                    break;
+                if (!hitButton && event.button.button == SDL_BUTTON_LEFT) {
+                    node.xCoordinates = event.button.x;
+                    node.yCoordinatesS = event.button.y;
+                    addnode(&node, &game);
                 }
-                    else if (event.button.button == SDL_BUTTON_RIGHT) {
-                    game.buttons[i].rightClick(&game.buttons[i]);
-                }
-            break;
-        }
-    }
-            if (!hitButton && event.button.button == SDL_BUTTON_LEFT) {
-                node.xcoordinate = event.button.x;
-                node.ycoordinate = event.button.y;
-                addnode(&node, &game);
-            }
-            break;
+                break;
+
+                case SDL_MOUSEBUTTONUP:
+
+                    for(int i = 0; i<game.nodeCount; i++){
+                        if (SDL_PointInRect(&mousePos, &game.buttons[i].area)) {
+                            hitButton = true;
+                        if(event.button.button == SDL_BUTTON_RIGHT && game.creatingBand){
+                            game.buttons[i].rightClick(&game.buttons[i], &game);
+                        }
+                    }
+                    break;
                 default:
                     break;
             
@@ -113,8 +139,8 @@ int main(void){
         SDL_RenderClear(game.renderer);
 
         SDL_RenderCopy(game.renderer, game.background, NULL, NULL);
-        for (int i = 0; i < game.count; i++) {
-            SDL_RenderCopy(game.renderer, game.nodesprite, NULL, &game.noderects[i]);
+        for (int i = 0; i < game.nodeCount; i++) {
+            SDL_RenderCopy(game.renderer, game.nodesprite, NULL, &game.nodeRects[i]);
         }
         SDL_RenderPresent(game.renderer);
 
@@ -165,7 +191,7 @@ bool init(struct Game *game){
         return true;
     }
     game -> nodesprite = IMG_LoadTexture(game ->renderer, "images/node.png");
-    if(SDL_QueryTexture(game -> nodesprite, NULL, NULL, &game -> texturewidth, &game->textureheight)){
+    if(SDL_QueryTexture(&game -> nodesprite, NULL, NULL, &game -> texturewidth, &game->textureheight)){
         fprintf(stderr, "error creating node's texture: %s \n", SDL_GetError());
         return true;
     }
@@ -183,19 +209,19 @@ bool load(struct Game *game){
 }
 
 void addnode(struct Node *node,struct Game *game){
-    SDL_Rect noderect;
-    noderect.h = game->textureheight;
-    noderect.w = game->texturewidth;
-    noderect.x = (int)round((float)node->xcoordinate / 64.0f) *64 -16;
-    noderect.y = (int)round((float)node ->ycoordinate / 64.0f) *64 -16;
+    SDL_Rect nodeRect;
+    nodeRect.h = game->textureheight;
+    nodeRect.w = game->texturewidth;
+    nodeRect.x = (int)round((float)node->xCoordinates / 64.0f) *64 -16;
+    nodeRect.y = (int)round((float)node ->yCoordinatesS / 64.0f) *64 -16;
 
-    game->noderects[game->count] = noderect;
-    game->buttons[game->count].area = noderect; 
-    game->buttons[game->count].leftClick = leftClickFunc;
-    game->buttons[game->count].rightClick = rightClickFunc;
+    game->nodeRects[game->nodeCount] = nodeRect;
+    game->buttons[game->nodeCount].area = nodeRect; 
+    game->buttons[game->nodeCount].leftClick = leftClickFunc;
+    game->buttons[game->nodeCount].rightClick = rightClickFunc;
 
-    game->noderects[game->count] = noderect; 
-    game->count ++;   
+    game->nodeRects[game->nodeCount] = nodeRect; 
+    game->nodeCount ++;   
 }
 
 void leftClickFunc(void *buttonPointer, void *gamePointer){
@@ -203,21 +229,27 @@ void leftClickFunc(void *buttonPointer, void *gamePointer){
     Button *clickedButton = (Button *)buttonPointer;
     struct Game *game = (struct Game *)gamePointer;
     int index = -1;
-    for (int i = 0; i < game->count; i++) {
+    for (int i = 0; i < game->nodeCount; i++) {
         if (&game->buttons[i] == clickedButton) {
             index = i;
             break;
         }
     }
     if (index != -1) {
-        game->noderects[index] = game->noderects[game->count - 1];
-        game->buttons[index] = game->buttons[game->count - 1];
-        game->count--;
+        game->nodeRects[index] = game->nodeRects[game->nodeCount - 1];
+        game->buttons[index] = game->buttons[game->nodeCount - 1];
+        game->nodeCount--;
     }
 }
-void rightClickFunc(void *self){
+void rightClickFunc(void *self, void *gamePointer){
     printf("rightclick\n");
-    int x = ((Button *)self)->area.x;
-    int y = ((Button *)self)->area.y;
+    struct Game *game = (struct Game *)gamePointer;
+    game->creatingBand = true;
+
+    int x = ((Button *)self)-> area.x;
+    int y = ((Button *)self)-> area.y;
+
+    game->xTempStartNode = x;
+    game -> yTempStartNode = y;
 }
 
