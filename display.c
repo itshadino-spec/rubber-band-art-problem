@@ -7,7 +7,7 @@
 
 #define title "rubber band art"
 #define height 640
-#define width 640
+#define width 800
 #define sixtyfps 16
 
 struct Node{  
@@ -41,6 +41,8 @@ struct Game{
     SDL_Texture *background;
     SDL_Texture *nodesprite;
     SDL_Texture *rubberBandSprite;
+    SDL_Texture *taskBar;
+    SDL_Texture *addButton;
     SDL_Rect nodeRects [400];
     RubberBand bands[500];
     Button buttons[500];
@@ -62,6 +64,7 @@ void delete(struct Game *game, int exitstatus);
 void addnode(struct Node *node, struct Game *game);
 void leftClickFunc(void *buttonPointer, void *gamePointer);
 void rightClickFunc(void *buttonPointer, void *gamePointer);
+void addLabelFunc();
 
 int main(void){
     bool clickflag = false;
@@ -106,7 +109,10 @@ int main(void){
                     for (int i = 0; i < game.nodeCount; i++) {
                         if (SDL_PointInRect(&mousePos, &game.buttons[i].area)) {
                             hitButton = true;
-                            if (event.button.button == SDL_BUTTON_LEFT) {
+                            if (i == 0 && event.button.button == SDL_BUTTON_LEFT ){
+                                game.buttons[i].leftClick(&game.buttons[i], &game);
+                            }
+                            else if (event.button.button == SDL_BUTTON_LEFT) {
                                 game.buttons[i].leftClick(&game.buttons[i], &game);
                             }
                             else if (event.button.button == SDL_BUTTON_RIGHT) {
@@ -114,7 +120,7 @@ int main(void){
                             }
                         }   
                     }
-                    if (!hitButton && event.button.button == SDL_BUTTON_LEFT) {
+                    if (!hitButton && event.button.button == SDL_BUTTON_LEFT && mousePos.x >= 160){
                         node.xCoordinates = event.button.x;
                         node.yCoordinatesS = event.button.y;
                         addnode(&node, &game);
@@ -157,9 +163,12 @@ int main(void){
 
         }
         SDL_RenderClear(game.renderer);
-
-
-        SDL_RenderCopy(game.renderer, game.background, NULL, NULL);
+        SDL_Rect backGroundRect = {160,0,640,640};
+        SDL_Rect taskBar = {0,0,160,640};
+        SDL_Rect addButton = {0,0,160,32};
+        SDL_RenderCopy(game.renderer, game.background, NULL, &backGroundRect);
+        SDL_RenderCopy(game.renderer,game.taskBar, NULL,&taskBar);
+        SDL_RenderCopy(game.renderer,game.addButton, NULL,&addButton);
         for(int i = 0; i < game.bandCount; i++){
             SDL_Rect destinationRect;
             destinationRect.x = game.bands[i].xStartingNode + 16;
@@ -196,6 +205,8 @@ void delete(struct Game *game, int exitstatus){
     if(game->background) SDL_DestroyTexture(game->background);
     if(game->nodesprite) SDL_DestroyTexture(game->nodesprite);
     if(game->rubberBandSprite) SDL_DestroyTexture(game->rubberBandSprite);
+    if(game->taskBar) SDL_DestroyTexture(game->taskBar);
+    if(game->addButton) SDL_DestroyTexture(game->addButton);
 
     SDL_DestroyRenderer(game -> renderer);
     SDL_DestroyWindow(game -> window);
@@ -230,17 +241,32 @@ bool init(struct Game *game){
         fprintf(stderr, "error creating renderer: %s \n", SDL_GetError());
         return true;
     }
-    game -> nodesprite = IMG_LoadTexture(game ->renderer, "images/node.png");
+    game -> nodesprite = IMG_LoadTexture(game ->renderer, "images/nodes.png");
     if(SDL_QueryTexture(game -> nodesprite, NULL, NULL, &game -> nodeTextureWidth, &game->nodeTextureHeight)){
         fprintf(stderr, "error creating node's texture: %s \n", SDL_GetError());
         return true;
     }
 
-    game -> rubberBandSprite = IMG_LoadTexture(game ->renderer, "images/red.png");
+    game -> rubberBandSprite = IMG_LoadTexture(game ->renderer, "images/line.png");
     if(SDL_QueryTexture(game -> rubberBandSprite, NULL, NULL, &game -> rubberBandTextureWidth, &game->rubberBandTextureHeight)){
-        fprintf(stderr, "error creating node's texture: %s \n", SDL_GetError());
+        fprintf(stderr, "error creating rubberband texture: %s \n", SDL_GetError());
         return true;
     }
+    game -> taskBar = IMG_LoadTexture(game ->renderer, "images/taskbar.png");
+    if (!game->taskBar) {
+        fprintf(stderr, "Failed to load taskbar: %s\n", IMG_GetError());
+        return true;
+    }
+    game -> addButton = IMG_LoadTexture(game ->renderer, "images/addbutton.png");
+    if (!game->addButton) {
+        fprintf(stderr, "Failed to load add button: %s\n", IMG_GetError());
+        return true;
+    }
+
+    game->buttons[0].area = (SDL_Rect){0,0,160,32};
+    game->buttons[0].leftClick = addLabelFunc;
+    game->buttons[0].rightClick = addLabelFunc;
+    game->nodeCount ++;
 
     return false;
 }
@@ -258,7 +284,7 @@ void addnode(struct Node *node,struct Game *game){
     SDL_Rect nodeRect;
     nodeRect.h = game->nodeTextureHeight;
     nodeRect.w = game->nodeTextureWidth;
-    nodeRect.x = (int)round((float)node->xCoordinates / 64.0f) *64 -16;
+    nodeRect.x = (int)round((float)node->xCoordinates / 64.0f) *64 - 48;
     nodeRect.y = (int)round((float)node ->yCoordinatesS / 64.0f) *64 -16;
 
     game->nodeRects[game->nodeCount] = nodeRect;
@@ -299,3 +325,6 @@ void rightClickFunc(void *self, void *gamePointer){
     game -> yTempStartNode = y;
 }
 
+void addLabelFunc(){
+    printf("testing\n");
+}
