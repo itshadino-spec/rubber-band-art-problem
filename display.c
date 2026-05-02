@@ -29,6 +29,13 @@ typedef struct{
 }RubberBand;
 
 typedef struct{
+    SDL_Texture *pallete;
+    int r;
+    int g;
+    int b;
+}Label;
+
+typedef struct{
     SDL_Rect area;
     SDL_Color colour;
 
@@ -49,6 +56,7 @@ struct Game{
     SDL_Rect nodeRects [400];
     RubberBand bands[500];
     Button buttons[500];
+    Label labels[100];
     bool creatingBand;
     int bandCount;
     int labelCount;
@@ -202,7 +210,14 @@ int main(void){
         }
         for (int i=0; i<game.labelCount; i++ ){
             SDL_Rect labelButton = {0,(32 + 32*i),160,32};
-            SDL_RenderCopy(game.renderer, game.label,NULL, &labelButton);
+            SDL_Rect labelColour ={64, (32 + 32 * i) + 2, 32, 28};
+            SDL_SetTextureColorMod(game.labels[i].pallete,
+                                    game.labels[i].r,
+                                    game.labels[i].g,
+                                    game.labels[i].b
+                                    );
+            SDL_RenderCopy(game.renderer, game.labels[i].pallete,NULL, &labelColour);
+            SDL_RenderCopy(game.renderer,game.label,NULL, &labelButton);
         }
         for (int i = 0; i < game.nodeCount; i++) {
             SDL_RenderCopy(game.renderer, game.nodesprite, NULL, &game.nodeRects[i]);
@@ -224,7 +239,9 @@ void delete(struct Game *game, int exitstatus){
     if(game->rubberBandSprite) SDL_DestroyTexture(game->rubberBandSprite);
     if(game->taskBar) SDL_DestroyTexture(game->taskBar);
     if(game->addButton) SDL_DestroyTexture(game->addButton);
-
+    for(int i = 0; i < game->labelCount; i++){
+        SDL_DestroyTexture(game->labels[i].pallete);
+    }
     SDL_DestroyRenderer(game -> renderer);
     SDL_DestroyWindow(game -> window);
     SDL_Quit();
@@ -321,7 +338,6 @@ void addnode(struct Node *node,struct Game *game){
 }
 
 void leftClickFunc(void *buttonPointer, void *gamePointer){
-    printf("leftclick\n");
     Button *clickedButton = (Button *)buttonPointer;
     struct Game *game = (struct Game *)gamePointer;
     int index = -1;
@@ -338,7 +354,6 @@ void leftClickFunc(void *buttonPointer, void *gamePointer){
     }
 }
 void rightClickFunc(void *self, void *gamePointer){
-    printf("rightclick\n");
     struct Game *game = (struct Game *)gamePointer;
     game->creatingBand = true;
 
@@ -359,6 +374,9 @@ void addLabelFunc(void *self, void *gamePointer){
 }
 
 void colour(int rgb[3], struct Game *game){
-    printf("test\n");
+    game->labels[game->labelCount].pallete = game->rubberBandSprite;
+    game->labels[game->labelCount].r = rgb[0];
+    game->labels[game->labelCount].g = rgb[1];
+    game->labels[game->labelCount].b = rgb[2];
     game->labelCount ++;
 }
