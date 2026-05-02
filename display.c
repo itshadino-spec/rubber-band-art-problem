@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
-
+#include <time.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
@@ -21,6 +21,7 @@ typedef struct{
     Sint32 yStartingNode;
     Sint32 xEndingNode;
     Sint32 yEndingNode;
+    SDL_Color colour;
     SDL_Rect bands [100];
     char label [100];
     int angle;
@@ -43,11 +44,14 @@ struct Game{
     SDL_Texture *rubberBandSprite;
     SDL_Texture *taskBar;
     SDL_Texture *addButton;
+    SDL_Texture *label;
+    SDL_Color activeColour;
     SDL_Rect nodeRects [400];
     RubberBand bands[500];
     Button buttons[500];
     bool creatingBand;
     int bandCount;
+    int labelCount;
     int nodeCount;
     int xTempStartNode;
     int yTempStartNode;
@@ -64,7 +68,8 @@ void delete(struct Game *game, int exitstatus);
 void addnode(struct Node *node, struct Game *game);
 void leftClickFunc(void *buttonPointer, void *gamePointer);
 void rightClickFunc(void *buttonPointer, void *gamePointer);
-void addLabelFunc();
+void addLabelFunc(void *self, void *gamePointer);
+void colour(int rgb[3] ,struct Game *game);
 
 int main(void){
     bool clickflag = false;
@@ -81,9 +86,11 @@ int main(void){
     button.rightClick = rightClickFunc;
 
     if(init(&game)){
+        printf("init error\n");
         delete(&game, EXIT_FAILURE);
     }
     if(load(&game)){
+        printf("load error\n");
         delete(&game, EXIT_FAILURE);
     }
 
@@ -137,6 +144,7 @@ int main(void){
                             game.bands[game.bandCount].yStartingNode = game.yTempStartNode;
                             game.bands[game.bandCount].xEndingNode = game.buttons[i].area.x;
                             game.bands[game.bandCount].yEndingNode = game.buttons[i].area.y;
+                            game.bands[game.bandCount].colour = game.activeColour; 
 
                             int xDelta = (game.bands[game.bandCount].xEndingNode) - (game.bands[game.bandCount].xStartingNode);
                             int yDelta = (game.bands[game.bandCount].yEndingNode) - (game.bands[game.bandCount].yStartingNode);
@@ -146,7 +154,6 @@ int main(void){
 
                             game.bands[game.bandCount].length = length;
                             game.bands[game.bandCount].angle = degrees;
-                            printf("degrees: %lf\nlength: %lf\n", degrees, length);
 
                             game.bandCount ++;
                             game.creatingBand = false;
@@ -176,6 +183,12 @@ int main(void){
             destinationRect.w = game.bands[i].length;             
             destinationRect.h = 4;
 
+            SDL_SetTextureColorMod(game.rubberBandSprite,
+                                    game.bands[i].colour.r,
+                                    game.bands[i].colour.g,
+                                    game.bands[i].colour.b
+                                );
+
             SDL_Point centre = {0,2};
             SDL_RenderCopyEx(
                 game.renderer, 
@@ -186,6 +199,10 @@ int main(void){
                 &centre,        
                 SDL_FLIP_NONE   
         );
+        }
+        for (int i=0; i<game.labelCount; i++ ){
+            SDL_Rect labelButton = {0,(32 + 32*i),160,32};
+            SDL_RenderCopy(game.renderer, game.label,NULL, &labelButton);
         }
         for (int i = 0; i < game.nodeCount; i++) {
             SDL_RenderCopy(game.renderer, game.nodesprite, NULL, &game.nodeRects[i]);
@@ -247,7 +264,7 @@ bool init(struct Game *game){
         return true;
     }
 
-    game -> rubberBandSprite = IMG_LoadTexture(game ->renderer, "images/line.png");
+    game -> rubberBandSprite = IMG_LoadTexture(game ->renderer, "images/line.bmp");
     if(SDL_QueryTexture(game -> rubberBandSprite, NULL, NULL, &game -> rubberBandTextureWidth, &game->rubberBandTextureHeight)){
         fprintf(stderr, "error creating rubberband texture: %s \n", SDL_GetError());
         return true;
@@ -262,11 +279,18 @@ bool init(struct Game *game){
         fprintf(stderr, "Failed to load add button: %s\n", IMG_GetError());
         return true;
     }
+    game -> label = IMG_LoadTexture(game -> renderer, "images/label.png");
+    if (!game->label){
+        fprintf(stderr, "failed to load label button: %s\n", IMG_GetError());
+        return true;
+    }
 
     game->buttons[0].area = (SDL_Rect){0,0,160,32};
     game->buttons[0].leftClick = addLabelFunc;
     game->buttons[0].rightClick = addLabelFunc;
     game->nodeCount ++;
+
+    srand((unsigned)time(NULL));
 
     return false;
 }
@@ -322,9 +346,19 @@ void rightClickFunc(void *self, void *gamePointer){
     int y = ((Button *)self)-> area.y;
 
     game->xTempStartNode = x;
-    game -> yTempStartNode = y;
+    game->yTempStartNode = y;
 }
 
-void addLabelFunc(){
-    printf("testing\n");
+void addLabelFunc(void *self, void *gamePointer){
+    struct Game *game = (struct Game *)gamePointer;
+    game->activeColour.r = rand() % 256;
+    game->activeColour.g = rand() % 256;
+    game->activeColour.b = rand() % 256;
+    int rgb[3] = {game->activeColour.r,game->activeColour.g,game->activeColour.b}; 
+    colour(rgb, game);
+}
+
+void colour(int rgb[3], struct Game *game){
+    printf("test\n");
+    game->labelCount ++;
 }
