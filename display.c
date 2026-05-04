@@ -385,7 +385,18 @@ void addnode(struct Node *node,struct Game *game){
 void leftClickFunc(void *buttonPointer, void *gamePointer){
     Button *clickedButton = (Button *)buttonPointer;
     struct Game *game = (struct Game *)gamePointer;
+    int xCoord = clickedButton->area.x;
+    int yCoord = clickedButton->area.y;
     int index = -1;
+
+    for (int i=0;i<game->bandCount;i++){
+        if(((game->bands[i].xStartingNode == xCoord) && (game->bands[i].yStartingNode == yCoord)) || ((game->bands[i].xEndingNode == xCoord) && (game->bands[i].yEndingNode == yCoord))){
+            game->bands[(game->bandCount)-1];
+            game->bandCount--;
+            i--;
+        }
+    }
+
     for (int i = 0; i < game->nodeCount; i++) {
         if (&game->buttons[i] == clickedButton) {
             index = i;
