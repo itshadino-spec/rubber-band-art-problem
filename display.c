@@ -9,6 +9,7 @@
 #define height 640
 #define width 800
 #define sixtyfps 16
+#define MAXLABELS 17
 
 struct Node{  
     Sint32 xCoordinates;
@@ -52,12 +53,16 @@ struct Game{
     SDL_Texture *taskBar;
     SDL_Texture *addButton;
     SDL_Texture *label;
+    SDL_Texture *up;
+    SDL_Texture *down;
     SDL_Color activeColour;
     SDL_Rect nodeRects [400];
     RubberBand bands[500];
     Button buttons[500];
+    Button labelButton[100];
     Label labels[100];
     bool creatingBand;
+    int offset;
     int bandCount;
     int labelCount;
     int nodeCount;
@@ -78,6 +83,9 @@ void leftClickFunc(void *buttonPointer, void *gamePointer);
 void rightClickFunc(void *buttonPointer, void *gamePointer);
 void addLabelFunc(void *self, void *gamePointer);
 void colour(int rgb[3] ,struct Game *game);
+void pickColour(void *self,void *gamePointer);
+void upPage(void *self,void *gamePointer);
+void downPage(void *self,void *gamePointer);
 
 int main(void){
     bool clickflag = false;
@@ -127,6 +135,12 @@ int main(void){
                             if (i == 0 && event.button.button == SDL_BUTTON_LEFT ){
                                 game.buttons[i].leftClick(&game.buttons[i], &game);
                             }
+                            else if(i == 1 && event.button.button == SDL_BUTTON_LEFT){
+                                game.buttons[i].leftClick(&game.buttons[i], &game);
+                            }
+                            else if(i == 2 && event.button.button == SDL_BUTTON_LEFT){
+                                game.buttons[i].leftClick(&game.buttons[i], &game);
+                            }
                             else if (event.button.button == SDL_BUTTON_LEFT) {
                                 game.buttons[i].leftClick(&game.buttons[i], &game);
                             }
@@ -134,6 +148,13 @@ int main(void){
                                 game.buttons[i].rightClick(&game.buttons[i], &game);
                             }
                         }   
+                    }
+                    for (int i=game.offset; (i<game.offset+MAXLABELS) && (i<game.labelCount); i++){
+                        SDL_Rect currRect = {0,((i-game.offset)*32 +32),160,32};
+                        if(SDL_PointInRect(&mousePos, &currRect)){
+                            hitButton = true;
+                            pickColour(&game.labels[i],&game);
+                        }
                     }
                     if (!hitButton && event.button.button == SDL_BUTTON_LEFT && mousePos.x >= 160){
                         node.xCoordinates = event.button.x;
@@ -181,9 +202,13 @@ int main(void){
         SDL_Rect backGroundRect = {160,0,640,640};
         SDL_Rect taskBar = {0,0,160,640};
         SDL_Rect addButton = {0,0,160,32};
+        SDL_Rect up = {0, 640 - 64, 160, 32};
+        SDL_Rect down = {0, 640 - 32, 160, 32};
         SDL_RenderCopy(game.renderer, game.background, NULL, &backGroundRect);
         SDL_RenderCopy(game.renderer,game.taskBar, NULL,&taskBar);
         SDL_RenderCopy(game.renderer,game.addButton, NULL,&addButton);
+        SDL_RenderCopy(game.renderer,game.up, NULL,&up);
+        SDL_RenderCopy(game.renderer,game.down, NULL,&down);
         for(int i = 0; i < game.bandCount; i++){
             SDL_Rect destinationRect;
             destinationRect.x = game.bands[i].xStartingNode + 16;
@@ -208,9 +233,10 @@ int main(void){
                 SDL_FLIP_NONE   
         );
         }
-        for (int i=0; i<game.labelCount; i++ ){
-            SDL_Rect labelButton = {0,(32 + 32*i),160,32};
-            SDL_Rect labelColour ={64, (32 + 32 * i) + 2, 32, 28};
+        for (int i= game.offset; (i<game.labelCount)&&((i-game.offset)<MAXLABELS); i++ ){
+            int index = i-game.offset;
+            SDL_Rect labelButton = {0,(32 + 32*index),160,32};
+            SDL_Rect labelColour ={64, (32 + 32*index) + 2, 32, 28};
             SDL_SetTextureColorMod(game.labels[i].pallete,
                                     game.labels[i].r,
                                     game.labels[i].g,
@@ -301,12 +327,31 @@ bool init(struct Game *game){
         fprintf(stderr, "failed to load label button: %s\n", IMG_GetError());
         return true;
     }
+    game -> up = IMG_LoadTexture(game -> renderer, "images/up.png");
+    if (!game->up){
+        fprintf(stderr, "failed to load up arrow button: %s\n", IMG_GetError());
+        return true;
+    }
+    game -> down = IMG_LoadTexture(game -> renderer, "images/down.png");
+    if (!game->down){
+        fprintf(stderr, "failed to load down arrow button: %s\n", IMG_GetError());
+        return true;
+    }
 
     game->buttons[0].area = (SDL_Rect){0,0,160,32};
     game->buttons[0].leftClick = addLabelFunc;
     game->buttons[0].rightClick = addLabelFunc;
-    game->nodeCount ++;
+    
 
+    game->buttons[1].area = (SDL_Rect){0, 640 - 64, 160, 32};
+    game->buttons[1].leftClick = upPage;
+    game->buttons[1].rightClick = upPage;
+
+    game->buttons[2].area = (SDL_Rect) {0, 640 - 32, 160, 32};
+    game->buttons[2].leftClick = downPage;
+    game->buttons[2].rightClick = downPage;
+
+    game->nodeCount = 3;
     srand((unsigned)time(NULL));
 
     return false;
@@ -363,7 +408,6 @@ void rightClickFunc(void *self, void *gamePointer){
     game->xTempStartNode = x;
     game->yTempStartNode = y;
 }
-
 void addLabelFunc(void *self, void *gamePointer){
     struct Game *game = (struct Game *)gamePointer;
     game->activeColour.r = rand() % 256;
@@ -372,11 +416,35 @@ void addLabelFunc(void *self, void *gamePointer){
     int rgb[3] = {game->activeColour.r,game->activeColour.g,game->activeColour.b}; 
     colour(rgb, game);
 }
-
 void colour(int rgb[3], struct Game *game){
     game->labels[game->labelCount].pallete = game->rubberBandSprite;
     game->labels[game->labelCount].r = rgb[0];
     game->labels[game->labelCount].g = rgb[1];
-    game->labels[game->labelCount].b = rgb[2];
+    game->labels[game->labelCount].b = rgb[2]; 
+
+    Button label;
+    label.area = (SDL_Rect){64, (32 + 32 * game->labelCount) + 2, 32, 28};
+    label.leftClick = pickColour;
+    label.rightClick = pickColour;
+    game->labelButton[game->labelCount] = label;
     game->labelCount ++;
+}
+void pickColour(void *self,void *gamePointer){
+    Label *clickedPallete = (Label *)self;
+    struct Game *game = (struct Game *)gamePointer;
+    game->activeColour.r = clickedPallete->r;
+    game->activeColour.g = clickedPallete->g;
+    game->activeColour.b = clickedPallete->b;
+}
+void upPage(void *self,void *gamePointer){
+    struct Game *game = (struct Game *)gamePointer;
+    if(game->offset > 0){
+        game->offset--;
+    }
+}
+void downPage(void *self,void *gamePointer){
+    struct Game *game = (struct Game *)gamePointer;
+    if((game->offset + MAXLABELS)<game->labelCount){
+        game->offset++;
+    }
 }
