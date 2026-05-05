@@ -10,6 +10,9 @@
 #define width 800
 #define sixtyfps 16
 #define MAXLABELS 17
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
 
 struct Node{  
     Sint32 xCoordinates;
@@ -25,7 +28,7 @@ typedef struct{
     SDL_Color colour;
     SDL_Rect bands [100];
     char label [100];
-    int angle;
+    double angle;
     int length;
 }RubberBand;
 
@@ -55,6 +58,8 @@ struct Game{
     SDL_Texture *label;
     SDL_Texture *up;
     SDL_Texture *down;
+    SDL_Texture *openingCap;
+    SDL_Texture *closingCap;
     SDL_Color activeColour;
     SDL_Rect nodeRects [400];
     RubberBand bands[500];
@@ -178,7 +183,7 @@ int main(void){
                             int xDelta = (game.bands[game.bandCount].xEndingNode) - (game.bands[game.bandCount].xStartingNode);
                             int yDelta = (game.bands[game.bandCount].yEndingNode) - (game.bands[game.bandCount].yStartingNode);
                             double rads = atan2(yDelta, xDelta);
-                            double degrees = rads * (180/3.14);
+                            double degrees = rads * (180.0 / M_PI);
                             double length = sqrt(pow(xDelta, 2) + pow(yDelta, 2));
 
                             game.bands[game.bandCount].length = length;
@@ -210,28 +215,39 @@ int main(void){
         SDL_RenderCopy(game.renderer,game.up, NULL,&up);
         SDL_RenderCopy(game.renderer,game.down, NULL,&down);
         for(int i = 0; i < game.bandCount; i++){
-            SDL_Rect destinationRect;
-            destinationRect.x = game.bands[i].xStartingNode + 16;
-            destinationRect.y = game.bands[i].yStartingNode + 16;
-            destinationRect.w = game.bands[i].length;             
-            destinationRect.h = 4;
+            double rad = game.bands[i].angle*(M_PI/180);
+            int y=game.bands[i].yStartingNode+32;
+            int x=game.bands[i].xStartingNode+32;
 
-            SDL_SetTextureColorMod(game.rubberBandSprite,
-                                    game.bands[i].colour.r,
-                                    game.bands[i].colour.g,
-                                    game.bands[i].colour.b
-                                );
-
-            SDL_Point centre = {0,2};
-            SDL_RenderCopyEx(
-                game.renderer, 
-                game.rubberBandSprite, 
-                NULL,           
-                &destinationRect,      
-                game.bands[i].angle, 
-                &centre,        
-                SDL_FLIP_NONE   
-        );
+            SDL_Rect capRect;
+            capRect.x=game.bands[i].xStartingNode;
+            capRect.y=game.bands[i].yStartingNode;
+            capRect.w=64;
+            capRect.h=64;
+            SDL_Rect closeRect;
+            closeRect.x=game.bands[i].xEndingNode;
+            closeRect.y=game.bands[i].yEndingNode;
+            closeRect.w=64;
+            closeRect.h=64;
+            SDL_Rect rightLine;
+            rightLine.x=x+(int)(32*(cos(rad+(M_PI/2))));
+            rightLine.y=y+(int)(32*(sin(rad+(M_PI/2))));
+            rightLine.w=game.bands[i].length;
+            rightLine.h=4;
+            SDL_Rect leftLine;
+            leftLine.x=x+(int)(32*(cos(rad-(M_PI/2))));
+            leftLine.y=y+(int)(32*(sin(rad-(M_PI/2))));
+            leftLine.w=game.bands[i].length;
+            leftLine.h=4;
+            SDL_SetTextureColorMod(game.openingCap,game.bands[i].colour.r,game.bands[i].colour.g,game.bands[i].colour.b);
+            SDL_SetTextureColorMod(game.closingCap,game.bands[i].colour.r,game.bands[i].colour.g,game.bands[i].colour.b);
+            SDL_SetTextureColorMod(game.rubberBandSprite,game.bands[i].colour.r,game.bands[i].colour.g, game.bands[i].colour.b);
+            SDL_Point fulcrum={24,24};
+            SDL_Point pivot={0,2};
+            SDL_RenderCopyEx(game.renderer, game.openingCap,NULL,&capRect,game.bands[i].angle,&fulcrum,SDL_FLIP_NONE);
+            SDL_RenderCopyEx(game.renderer, game.closingCap,NULL,&closeRect,game.bands[i].angle,&fulcrum,SDL_FLIP_NONE);
+            SDL_RenderCopyEx(game.renderer, game.rubberBandSprite,NULL,&rightLine,game.bands[i].angle,&pivot,SDL_FLIP_NONE);
+            SDL_RenderCopyEx(game.renderer, game.rubberBandSprite,NULL,&leftLine,game.bands[i].angle,&pivot,SDL_FLIP_NONE);
         }
         for (int i= game.offset; (i<game.labelCount)&&((i-game.offset)<MAXLABELS); i++ ){
             int index = i-game.offset;
@@ -265,6 +281,10 @@ void delete(struct Game *game, int exitstatus){
     if(game->rubberBandSprite) SDL_DestroyTexture(game->rubberBandSprite);
     if(game->taskBar) SDL_DestroyTexture(game->taskBar);
     if(game->addButton) SDL_DestroyTexture(game->addButton);
+    if(game->up) SDL_DestroyTexture(game->up);
+    if(game->down) SDL_DestroyTexture(game->down);
+    if(game->openingCap) SDL_DestroyTexture(game->openingCap);
+    if(game->closingCap) SDL_DestroyTexture(game->closingCap);
     for(int i = 0; i < game->labelCount; i++){
         SDL_DestroyTexture(game->labels[i].pallete);
     }
@@ -337,6 +357,16 @@ bool init(struct Game *game){
         fprintf(stderr, "failed to load down arrow button: %s\n", IMG_GetError());
         return true;
     }
+    game -> openingCap = IMG_LoadTexture(game -> renderer, "images/openingcap.png");
+    if (!game->openingCap){
+        fprintf(stderr, "failed to load down arrow button: %s\n", IMG_GetError());
+        return true;
+    }
+    game -> closingCap = IMG_LoadTexture(game -> renderer, "images/closingcap.png");
+    if (!game->closingCap){
+        fprintf(stderr, "failed to load down arrow button: %s\n", IMG_GetError());
+        return true;
+    }
 
     game->buttons[0].area = (SDL_Rect){0,0,160,32};
     game->buttons[0].leftClick = addLabelFunc;
@@ -391,7 +421,7 @@ void leftClickFunc(void *buttonPointer, void *gamePointer){
 
     for (int i=0;i<game->bandCount;i++){
         if(((game->bands[i].xStartingNode == xCoord) && (game->bands[i].yStartingNode == yCoord)) || ((game->bands[i].xEndingNode == xCoord) && (game->bands[i].yEndingNode == yCoord))){
-            game->bands[(game->bandCount)-1];
+            game->bands[game->bandCount-1];
             game->bandCount--;
             i--;
         }
