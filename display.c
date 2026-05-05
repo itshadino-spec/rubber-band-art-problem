@@ -110,6 +110,7 @@ int main(void){
         printf("init error\n");
         delete(&game, EXIT_FAILURE);
     }
+    
     if(load(&game)){
         printf("load error\n");
         delete(&game, EXIT_FAILURE);
@@ -239,11 +240,13 @@ int main(void){
             leftLine.y=y+(int)(32*(sin(rad-(M_PI/2))));
             leftLine.w=game.bands[i].length;
             leftLine.h=4;
+
             SDL_SetTextureColorMod(game.openingCap,game.bands[i].colour.r,game.bands[i].colour.g,game.bands[i].colour.b);
             SDL_SetTextureColorMod(game.closingCap,game.bands[i].colour.r,game.bands[i].colour.g,game.bands[i].colour.b);
             SDL_SetTextureColorMod(game.rubberBandSprite,game.bands[i].colour.r,game.bands[i].colour.g, game.bands[i].colour.b);
             SDL_Point fulcrum={24,24};
             SDL_Point pivot={0,2};
+
             SDL_RenderCopyEx(game.renderer, game.openingCap,NULL,&capRect,game.bands[i].angle,&fulcrum,SDL_FLIP_NONE);
             SDL_RenderCopyEx(game.renderer, game.closingCap,NULL,&closeRect,game.bands[i].angle,&fulcrum,SDL_FLIP_NONE);
             SDL_RenderCopyEx(game.renderer, game.rubberBandSprite,NULL,&rightLine,game.bands[i].angle,&pivot,SDL_FLIP_NONE);
@@ -439,6 +442,7 @@ void leftClickFunc(void *buttonPointer, void *gamePointer){
         game->nodeCount--;
     }
 }
+
 void rightClickFunc(void *self, void *gamePointer){
     struct Game *game = (struct Game *)gamePointer;
     game->creatingBand = true;
@@ -449,6 +453,7 @@ void rightClickFunc(void *self, void *gamePointer){
     game->xTempStartNode = x;
     game->yTempStartNode = y;
 }
+
 void addLabelFunc(void *self, void *gamePointer){
     struct Game *game = (struct Game *)gamePointer;
     game->activeColour.r = rand() % 256;
@@ -457,6 +462,7 @@ void addLabelFunc(void *self, void *gamePointer){
     int rgb[3] = {game->activeColour.r,game->activeColour.g,game->activeColour.b}; 
     colour(rgb, game);
 }
+
 void colour(int rgb[3], struct Game *game){
     game->labels[game->labelCount].pallete = game->rubberBandSprite;
     game->labels[game->labelCount].r = rgb[0];
@@ -470,6 +476,7 @@ void colour(int rgb[3], struct Game *game){
     game->labelButton[game->labelCount] = label;
     game->labelCount ++;
 }
+
 void pickColour(void *self,void *gamePointer){
     Label *clickedPallete = (Label *)self;
     struct Game *game = (struct Game *)gamePointer;
@@ -477,12 +484,14 @@ void pickColour(void *self,void *gamePointer){
     game->activeColour.g = clickedPallete->g;
     game->activeColour.b = clickedPallete->b;
 }
+
 void upPage(void *self,void *gamePointer){
     struct Game *game = (struct Game *)gamePointer;
     if(game->offset > 0){
         game->offset--;
     }
 }
+
 void downPage(void *self,void *gamePointer){
     struct Game *game = (struct Game *)gamePointer;
     if((game->offset + MAXLABELS)<game->labelCount){
